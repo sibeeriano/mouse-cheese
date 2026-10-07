@@ -15,7 +15,19 @@ Abre [http://127.0.0.1:38471](http://127.0.0.1:38471).
 
 El servidor escucha en `0.0.0.0:38471`. Tiene que estar en marcha **en el ordenador cuyo puntero quieres mover**. Si abres la página desde otro equipo, o si el servidor corre en una máquina remota, el cursor de tu escritorio no se mueve.
 
-No expongas el puerto en una red que no controles: quien pueda llamar a la API puede arrancar el mordisco.
+No expongas el puerto en una red que no controles: quien pueda llamar a la API en `localhost` puede arrancar el mordisco. Desde otro nombre de host, Comenzar se niega.
+
+## Vercel
+
+El cartel se puede publicar en Vercel para que cualquiera lo vea:
+
+```bash
+npx vercel
+```
+
+Eso no mueve el ratón de quien abre el enlace. El navegador no tiene permiso para mover el puntero del sistema, y la función de Vercel corre en un centro de datos, sin tu pantalla ni tu ratón. Cada persona que quiera el mordisco tiene que ejecutar `npm run dev` en su propia computadora y abrir `http://127.0.0.1:38471`.
+
+Si la página no se sirve desde `localhost` o `127.0.0.1`, el cartel lo dice y no intenta mover nada.
 
 ## Permisos
 

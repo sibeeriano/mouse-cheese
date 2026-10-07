@@ -422,6 +422,42 @@
   line-height: 1.4;
 }
 
+.steps {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.steps li {
+  counter-increment: step;
+  border: 3px solid #1a120b;
+  background: #fff15a;
+  box-shadow: 4px 4px 0 #1a120b;
+  padding: 0.55rem 0.7rem 0.55rem 2.4rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.92rem;
+  font-weight: 700;
+  position: relative;
+}
+
+.steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0.55rem;
+  top: 0.45rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: grid;
+  place-items: center;
+  border: 2px solid #1a120b;
+  background: #ff4d00;
+  color: #fffaf0;
+  font-size: 0.8rem;
+}
+
 .footnote {
   margin-top: 0.85rem;
   font-family: var(--font-mono), ui-monospace, monospace;

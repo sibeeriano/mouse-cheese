@@ -21,7 +21,7 @@ const PLATFORM_NAME: Record<JiggleStatus["platform"], string> = {
   other: "este sistema",
 };
 
-export function CheesePoster() {
+export function CheesePoster({ localMachine }: { localMachine: boolean }) {
   const [status, setStatus] = useState<JiggleStatus | null>(null);
   const [intervalSeconds, setIntervalSeconds] = useState<IntervalSeconds>(15);
   const [pending, setPending] = useState(false);
@@ -35,6 +35,7 @@ export function CheesePoster() {
   }, []);
 
   useEffect(() => {
+    if (!localMachine) return;
     let cancelled = false;
 
     async function pull() {
@@ -59,7 +60,7 @@ export function CheesePoster() {
       cancelled = true;
       window.clearInterval(poll);
     };
-  }, []);
+  }, [localMachine]);
 
   async function send(body: { action: "start"; intervalSeconds: IntervalSeconds } | { action: "stop" }) {
     const seen = ++epoch.current;
@@ -102,15 +103,23 @@ export function CheesePoster() {
     running && status?.nextNudgeAt != null && now != null
       ? Math.max(0, Math.ceil((status.nextNudgeAt - now) / 1000))
       : null;
-  const ready = status !== null || requestError !== null;
-  const ticketClass = alertMessage && !running ? "ticket ticket-error" : running ? "ticket ticket-hot" : "ticket";
-  const ticketLabel = !ready
-    ? "Comprobando"
+  const ready = !localMachine || status !== null || requestError !== null;
+  const ticketClass = !localMachine
+    ? "ticket ticket-error"
     : alertMessage && !running
-      ? "Error"
+      ? "ticket ticket-error"
       : running
-        ? "En movimiento"
-        : "En espera";
+        ? "ticket ticket-hot"
+        : "ticket";
+  const ticketLabel = !localMachine
+    ? "Otro equipo"
+    : !ready
+      ? "Comprobando"
+      : alertMessage && !running
+        ? "Error"
+        : running
+          ? "En movimiento"
+          : "En espera";
 
   return (
     <div className="cheese-body flex min-h-dvh flex-col overflow-x-hidden">
@@ -131,7 +140,7 @@ export function CheesePoster() {
             </p>
             <p className="stamp" aria-hidden="true">
               <small>100%</small>
-              <strong>local</strong>
+              <strong>{localMachine ? "local" : "remoto"}</strong>
             </p>
           </div>
 
@@ -150,13 +159,13 @@ export function CheesePoster() {
 
           <div className="rule" aria-hidden="true" />
 
-          {alertMessage ? (
+          {localMachine && alertMessage ? (
             <p className="alert-sticker" role="alert">
               {alertMessage}
             </p>
           ) : null}
 
-          {running ? (
+          {localMachine && running ? (
             <div className="countdown">
               <strong>{secondsLeft ?? "…"}</strong>
               <span>
@@ -169,6 +178,52 @@ export function CheesePoster() {
             </div>
           ) : null}
 
+          {localMachine ? (
+            <LocalControls
+              running={running}
+              ready={ready}
+              pending={pending}
+              intervalSeconds={intervalSeconds}
+              onInterval={chooseInterval}
+              onToggle={() =>
+                void send(running ? { action: "stop" } : { action: "start", intervalSeconds })
+              }
+              platform={status ? PLATFORM_NAME[status.platform] : null}
+            />
+          ) : (
+            <RemoteNotice />
+          )}
+        </article>
+      </main>
+
+      <footer className="site-footer">
+        {localMachine
+          ? "Este servidor está en tu equipo. Comenzar mueve el puntero de esta computadora."
+          : "Vercel puede mostrar este cartel a cualquiera. El puntero solo se mueve si el programa corre en esa misma computadora."}
+      </footer>
+    </div>
+  );
+}
+
+function LocalControls({
+  running,
+  ready,
+  pending,
+  intervalSeconds,
+  onInterval,
+  onToggle,
+  platform,
+}: {
+  running: boolean;
+  ready: boolean;
+  pending: boolean;
+  intervalSeconds: IntervalSeconds;
+  onInterval: (next: IntervalSeconds) => void;
+  onToggle: () => void;
+  platform: string | null;
+}) {
+  return (
+    <>
           <p className="lead">
             {running
               ? "El puntero está en movimiento. Cada mordisco dura un instante y el cursor vuelve solo a su sitio."
@@ -186,7 +241,7 @@ export function CheesePoster() {
                   className="interval-button"
                   aria-pressed={intervalSeconds === option.value}
                   aria-label={option.name}
-                  onClick={() => chooseInterval(option.value)}
+                  onClick={() => onInterval(option.value)}
                 >
                   {option.label}
                 </Button>
@@ -201,26 +256,36 @@ export function CheesePoster() {
             type="button"
             className={running ? "action-button stop" : "action-button"}
             disabled={pending || !ready}
-            onClick={() =>
-              void send(
-                running ? { action: "stop" } : { action: "start", intervalSeconds },
-              )
-            }
+            onClick={onToggle}
           >
             {pending ? "Un momento…" : running ? "Detener" : "Comenzar"}
           </Button>
 
           <p className="footnote">
-            El servidor
-            {status ? ` (${PLATFORM_NAME[status.platform]})` : ""} es quien mueve el ratón, no la página.
+            El servidor{platform ? ` (${platform})` : ""} es quien mueve el ratón, no la página.
           </p>
-        </article>
-      </main>
+    </>
+  );
+}
 
-      <footer className="site-footer">
-        Abre mouse&cheese en el ordenador que quieres mantener despierto. Si el servidor corre en otra máquina, el puntero de esta no se entera.
-      </footer>
-    </div>
+function RemoteNotice() {
+  return (
+    <>
+      <p className="alert-sticker" role="alert">
+        Tu ratón no se mueve desde aquí. Esta página está en otro equipo. El navegador no puede mover el puntero, y un servidor en Vercel tampoco: no es tu computadora.
+      </p>
+      <p className="lead">
+        Cualquiera puede abrir el sitio. El mordisco, en cambio, corre en la máquina de cada persona. En tu computadora:
+      </p>
+      <ol className="steps">
+        <li>npm install</li>
+        <li>npm run dev</li>
+        <li>Abre http://127.0.0.1:38471 y pulsa Comenzar</li>
+      </ol>
+      <p className="hint mt-3">
+        Publicar el cartel en Vercel sirve para compartirlo. Slack, Teams y la suspensión solo se enteran si el programa está en marcha en el mismo equipo que el puntero.
+      </p>
+    </>
   );
 }
 
