@@ -54,7 +54,7 @@ export function CheesePoster() {
     }
 
     void pull();
-    const poll = window.setInterval(() => void pull(), 1000);
+    const poll = window.setInterval(() => void pull(), 400);
     return () => {
       cancelled = true;
       window.clearInterval(poll);
@@ -95,6 +95,8 @@ export function CheesePoster() {
   }
 
   const running = status?.running ?? false;
+  const justNibbled =
+    status?.lastNudgeAt != null && now != null && now - status.lastNudgeAt < 900;
   const alertMessage = requestError ?? status?.lastError ?? null;
   const secondsLeft =
     running && status?.nextNudgeAt != null && now != null
@@ -143,7 +145,7 @@ export function CheesePoster() {
                 </span>
               </h1>
             </div>
-            <CheeseMark running={running} />
+            <CheeseMark running={running || justNibbled} />
           </div>
 
           <div className="rule" aria-hidden="true" />
@@ -158,9 +160,11 @@ export function CheesePoster() {
             <div className="countdown">
               <strong>{secondsLeft ?? "…"}</strong>
               <span>
-                {secondsLeft === 1
-                  ? "segundo para el próximo mordisco"
-                  : "segundos para el próximo mordisco"}
+                {justNibbled
+                  ? "mordisco: el puntero se apartó y ya volvió"
+                  : secondsLeft === 1
+                    ? "segundo para el próximo mordisco"
+                    : "segundos para el próximo mordisco"}
               </span>
             </div>
           ) : null}
@@ -190,7 +194,7 @@ export function CheesePoster() {
             </div>
           </fieldset>
           <p className="hint mt-3">
-            Entre 15 y 30 píxeles, ida y vuelta en una fracción de segundo. No hace clic.
+            Se aparta unos 30 píxeles, se queda medio segundo y vuelve al mismo punto. Elegir 5 s no arranca solo: hace falta Comenzar. No hace clic.
           </p>
 
           <Button

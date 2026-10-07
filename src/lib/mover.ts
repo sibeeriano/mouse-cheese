@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 
-const NUDGE_PAUSE_MS = 200;
+const NUDGE_PAUSE_MS = 550;
 const COMMAND_TIMEOUT_MS = 5000;
 
 type RunResult = { stdout: string; stderr: string };
@@ -161,7 +161,7 @@ def shift(delta_x, delta_y):
     quartz.CGEventPost(quartz.kCGHIDEventTap, moved)
 
 shift(dx, dy)
-time.sleep(0.2)
+time.sleep(0.55)
 shift(-dx, -dy)
 `;
 
@@ -224,7 +224,7 @@ async function nudgeMac(
       try {
         await run("cliclick", [
           `m:${cliclickToken(dx)},${cliclickToken(dy)}`,
-          "w:200",
+          "w:550",
           `m:${cliclickToken(-dx)},${cliclickToken(-dy)}`,
         ]);
         return "cliclick";
@@ -257,8 +257,8 @@ async function nudgeWithTool(
 ): Promise<void> {
   const move =
     command === "xdotool"
-      ? 'xdotool mousemove_relative -- "$1" "$2" && sleep 0.2 && xdotool mousemove_relative -- "$((-1 * $1))" "$((-1 * $2))"'
-      : 'ydotool mousemove -- "$1" "$2" && sleep 0.2 && ydotool mousemove -- "$((-1 * $1))" "$((-1 * $2))"';
+      ? 'xdotool mousemove_relative -- "$1" "$2" && sleep 0.55 && xdotool mousemove_relative -- "$((-1 * $1))" "$((-1 * $2))"'
+      : 'ydotool mousemove -- "$1" "$2" && sleep 0.55 && ydotool mousemove -- "$((-1 * $1))" "$((-1 * $2))"';
 
   await run("bash", ["-c", move, "nudge", String(dx), String(dy)]);
 }
@@ -280,9 +280,9 @@ export function defaultTool(): string {
 export async function nudgeAndReturn(stillActive: () => boolean): Promise<string | null> {
   if (!stillActive()) return null;
 
-  const magnitude = 15 + Math.floor(Math.random() * 16);
+  const magnitude = 32 + Math.floor(Math.random() * 9);
   const dx = Math.random() < 0.5 ? magnitude : -magnitude;
-  const dy = 0;
+  const dy = Math.random() < 0.5 ? 18 : -18;
   assertDelta(dx, dy);
 
   if (process.platform === "win32") {

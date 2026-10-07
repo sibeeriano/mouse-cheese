@@ -2,7 +2,7 @@
 
 Un ratón que mordisquea el puntero para que el equipo no se suspenda y Slack, Teams u otras apps no te marquen ausente.
 
-La página es un cartel retro. **Comenzar** pone en marcha un solo bucle en el servidor de Next.js. Cada cierto tiempo el puntero se mueve unos 15–30 píxeles y, en unos 200 ms, vuelve al sitio. **Detener** corta el bucle. El navegador no puede mover el puntero del sistema: lo hace el proceso de Node, con el comando nativo de cada sistema.
+La página es un cartel retro. **Comenzar** pone en marcha un solo bucle en el servidor de Next.js. Cada cierto tiempo el puntero se aparta unos 30–40 píxeles, se queda cerca de medio segundo (para que se note) y vuelve al sitio. **Detener** corta el bucle. Elegir el intervalo no arranca el mordisco: hace falta pulsar Comenzar. El navegador no puede mover el puntero del sistema: lo hace el proceso de Node, con el comando nativo de cada sistema.
 
 ## Cómo correrlo
 
