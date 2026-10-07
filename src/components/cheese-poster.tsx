@@ -120,7 +120,7 @@ export function CheesePoster() {
       </div>
       <div className="checker" aria-hidden="true" />
 
-      <main className="flex flex-1 items-center justify-center px-3 py-8 sm:px-6 sm:py-14">
+      <main className="flex flex-1 items-center justify-center px-3 py-6 sm:px-6 sm:py-8">
         <article className="poster" aria-labelledby="wordmark">
           <div className="poster-top">
             <p className={ticketClass} role="status" aria-live="polite">
