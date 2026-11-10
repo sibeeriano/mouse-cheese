@@ -1,10 +1,20 @@
 # mouse&cheese
 
-Un ratón que mordisquea el puntero para que el equipo no se suspenda y Slack, Teams u otras apps no te marquen ausente.
+El clic de la macro de Excel está en la app de Windows, en `windows/`. Se empaqueta en MSIX para la Microsoft Store. Hay que compilarla en Windows. Los pasos están en `windows/README.md`.
 
-La página es un cartel retro. **Comenzar** pone en marcha un solo bucle en el servidor de Next.js. Cada cierto tiempo el puntero se aparta unos 30–40 píxeles, se queda cerca de medio segundo (para que se note) y vuelve al sitio. **Detener** corta el bucle. Elegir el intervalo no arranca el mordisco: hace falta pulsar Comenzar. El navegador no puede mover el puntero del sistema: lo hace el proceso de Node, con el comando nativo de cada sistema.
+La página web solo puede mantener la pantalla encendida. El navegador no deja mover el ratón ni hacer clic en otras apps, y un complemento de Office tampoco.
 
-## Cómo correrlo
+## La página
+
+Una página que mantiene la pantalla despierta. Cualquiera la abre en su navegador y pulsa **Comenzar**. No hay servidor local ni programa que instalar.
+
+**Comenzar** pide un [Screen Wake Lock](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API): mientras la pestaña sigue abierta y visible, el navegador le dice al sistema que no apague la pantalla. **Detener** lo suelta. Si cambias de pestaña, el navegador puede soltarlo; al volver, la página lo pide otra vez.
+
+El navegador no deja que una página mueva el ratón ni haga clic en Excel, Slack o Teams. Por eso esta web no imita la macro: no puede generar actividad de ratón en el sistema, y Slack o Teams pueden seguir marcando ausente. Lo que sí hace es evitar que se apague la pantalla.
+
+Hace falta un navegador con Wake Lock: Chrome, Edge o Safari. El botón tiene que pulsarse en la propia página, con la pestaña a la vista.
+
+## Cómo verla en local
 
 ```bash
 npm install
@@ -13,26 +23,10 @@ npm run dev
 
 Abre [http://127.0.0.1:38471](http://127.0.0.1:38471).
 
-El servidor escucha en `0.0.0.0:38471`. Tiene que estar en marcha **en el ordenador cuyo puntero quieres mover**. Si abres la página desde otro equipo, o si el servidor corre en una máquina remota, el cursor de tu escritorio no se mueve.
-
-No expongas el puerto en una red que no controles: quien pueda llamar a la API en `localhost` puede arrancar el mordisco. Desde otro nombre de host, Comenzar se niega.
-
-## Vercel
-
-El cartel se puede publicar en Vercel para que cualquiera lo vea:
+## Publicarla
 
 ```bash
 npx vercel
 ```
 
-Eso no mueve el ratón de quien abre el enlace. El navegador no tiene permiso para mover el puntero del sistema, y la función de Vercel corre en un centro de datos, sin tu pantalla ni tu ratón. Cada persona que quiera el mordisco tiene que ejecutar `npm run dev` en su propia computadora y abrir `http://127.0.0.1:38471`.
-
-Si la página no se sirve desde `localhost` o `127.0.0.1`, el cartel lo dice y no intenta mover nada.
-
-## Permisos
-
-- **macOS.** El movimiento usa Python 3 y Quartz (`CGEvent`, eventos de ratón movido). Si el sistema lo bloquea, entra en Ajustes del Sistema → Privacidad y seguridad → Accesibilidad y permite la terminal o la app que ejecuta el servidor (Terminal, iTerm o el proceso de Node). Si Python no tiene Quartz, se intenta `cliclick`.
-- **Linux.** Se usa `xdotool mousemove_relative` (ida y vuelta). Si no está, se intenta `ydotool`. Hace falta una sesión gráfica (`DISPLAY` o el demonio de ydotool).
-- **Windows.** PowerShell llama a `mouse_event` con `MOUSEEVENTF_MOVE` (`0x0001`): un empujón y el inverso.
-
-El intervalo se elige en la página: 5, 15, 30 o 60 segundos. Por defecto, 15. Nada se mueve hasta que pulsas Comenzar. Al salir el proceso, el bucle se cancela.
+Quien abra el enlace usa el botón en su propio navegador. El servidor solo entrega la página.

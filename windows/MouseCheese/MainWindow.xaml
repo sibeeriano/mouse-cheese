@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="MouseCheese.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="mouse and cheese">
+    <Grid Background="#FFE14D" Padding="24">
+        <Border Background="#FFF8E7" BorderBrush="#1A120B" BorderThickness="4" Padding="28">
+            <StackPanel Spacing="14" MaxWidth="440">
+                <TextBlock
+                    Text="mouse and cheese"
+                    FontSize="36"
+                    FontWeight="Bold"
+                    Foreground="#1A120B" />
+                <TextBlock
+                    x:Name="StatusText"
+                    AutomationProperties.LiveSetting="Polite"
+                    Text="En espera"
+                    FontWeight="Bold"
+                    Foreground="#FF4D00" />
+                <TextBlock
+                    TextWrapping="Wrap"
+                    Foreground="#1A120B"
+                    Text="Igual que la macro de Excel: un clic izquierdo donde ya esté el puntero, cada cierto tiempo. El cursor no se mueve." />
+                <ComboBox
+                    x:Name="IntervalBox"
+                    Header="Intervalo"
+                    SelectedIndex="2"
+                    HorizontalAlignment="Stretch">
+                    <ComboBoxItem Content="5 segundos" Tag="5" />
+                    <ComboBoxItem Content="15 segundos" Tag="15" />
+                    <ComboBoxItem Content="30 segundos" Tag="30" />
+                    <ComboBoxItem Content="60 segundos" Tag="60" />
+                </ComboBox>
+                <Button
+                    x:Name="ToggleButton"
+                    Content="Comenzar"
+                    Click="Toggle_Click"
+                    Height="64"
+                    FontSize="22"
+                    FontWeight="Bold"
+                    Background="#FF4D00"
+                    Foreground="#FFFAF0"
+                    HorizontalAlignment="Stretch" />
+                <TextBlock
+                    TextWrapping="Wrap"
+                    Foreground="#1A120B"
+                    Text="El clic cae donde esté el puntero. Dejalo sobre una celda vacía o el escritorio. Si está sobre esta ventana, ese clic se salta. El primero espera el intervalo, para que puedas apartar el puntero del botón." />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

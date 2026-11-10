@@ -1,125 +1,131 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { type IntervalSeconds, type JiggleStatus } from "@/lib/protocol";
 import { useEffect, useRef, useState } from "react";
 
 const TICKER =
-  "MOUSE&CHEESE   ·   EL RATÓN NO DUERME   ·   TU PC SIGUE DESPIERTA   ·   NADIE TE MARCA AUSENTE   ·   EL PUNTERO VUELVE A SU SITIO   ·   ";
+  "MOUSE&CHEESE   ·   LA PANTALLA NO SE DUERME   ·   ABRE LA PÁGINA Y PULSA COMENZAR   ·   SIN INSTALAR NADA   ·   ";
 
-const INTERVAL_OPTIONS: { value: IntervalSeconds; label: string; name: string }[] = [
-  { value: 5, label: "5 s", name: "Cada 5 segundos" },
-  { value: 15, label: "15 s", name: "Cada 15 segundos" },
-  { value: 30, label: "30 s", name: "Cada 30 segundos" },
-  { value: 60, label: "60 s", name: "Cada 60 segundos" },
-];
-
-const PLATFORM_NAME: Record<JiggleStatus["platform"], string> = {
-  windows: "Windows",
-  macos: "macOS",
-  linux: "Linux",
-  other: "este sistema",
-};
-
-export function CheesePoster({ localMachine }: { localMachine: boolean }) {
-  const [status, setStatus] = useState<JiggleStatus | null>(null);
-  const [intervalSeconds, setIntervalSeconds] = useState<IntervalSeconds>(15);
+export function CheesePoster() {
+  const [running, setRunning] = useState(false);
   const [pending, setPending] = useState(false);
-  const [requestError, setRequestError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [supported, setSupported] = useState(true);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState<number | null>(null);
-  const epoch = useRef(0);
+  const wantRef = useRef(false);
+  const lockRef = useRef<WakeLockSentinel | null>(null);
+  const holdRef = useRef<() => Promise<void>>(async () => {});
+  const acquiring = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
+    setSupported("wakeLock" in navigator);
     const clock = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(clock);
   }, []);
 
   useEffect(() => {
-    if (!localMachine) return;
-    let cancelled = false;
-
-    async function pull() {
-      const seen = epoch.current;
-      try {
-        const response = await fetch("/api/jiggle", { cache: "no-store" });
-        if (!response.ok) throw new Error("status");
-        const data = (await response.json()) as JiggleStatus;
-        if (cancelled || seen !== epoch.current) return;
-        setStatus(data);
-        if (data.running) setIntervalSeconds(data.intervalSeconds);
-        setRequestError(null);
-      } catch {
-        if (cancelled || seen !== epoch.current) return;
-        setRequestError("No se pudo hablar con el servidor local.");
-      }
-    }
-
-    void pull();
-    const poll = window.setInterval(() => void pull(), 400);
-    return () => {
-      cancelled = true;
-      window.clearInterval(poll);
-    };
-  }, [localMachine]);
-
-  async function send(body: { action: "start"; intervalSeconds: IntervalSeconds } | { action: "stop" }) {
-    const seen = ++epoch.current;
-    setPending(true);
-    try {
-      const response = await fetch("/api/jiggle", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+    const onVisible = () => {
+      if (!wantRef.current || document.visibilityState !== "visible") return;
+      void holdRef.current().catch((cause: unknown) => {
+        wantRef.current = false;
+        setRunning(false);
+        setStartedAt(null);
+        setError(messageFrom(cause));
       });
-      const data = (await response.json()) as JiggleStatus & { error?: string };
-      if (seen !== epoch.current) return;
-      if (!response.ok) {
-        setRequestError(data.error ?? "No se pudo completar la acción.");
-        return;
-      }
-      setStatus(data);
-      setIntervalSeconds(data.intervalSeconds);
-      setRequestError(null);
-    } catch {
-      if (seen !== epoch.current) return;
-      setRequestError("No se pudo hablar con el servidor local.");
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      wantRef.current = false;
+      void lockRef.current?.release();
+    };
+  }, []);
+
+  async function hold() {
+    if (lockRef.current && !lockRef.current.released) return;
+    if (acquiring.current) return acquiring.current;
+    if (!("wakeLock" in navigator)) {
+      throw new Error(
+        "Este navegador no puede mantener la pantalla despierta. Prueba con Chrome, Edge o Safari.",
+      );
+    }
+
+    const job = navigator.wakeLock.request("screen");
+    let finish: (error?: unknown) => void = () => {};
+    const wait = new Promise<void>((resolve, reject) => {
+      finish = (error) => (error === undefined ? resolve() : reject(error));
+    });
+    wait.catch(() => {});
+    acquiring.current = wait;
+    let sentinel: WakeLockSentinel;
+    try {
+      sentinel = await job;
+      finish();
+    } catch (error) {
+      finish(error);
+      throw error;
     } finally {
-      if (seen === epoch.current) setPending(false);
+      if (acquiring.current === wait) acquiring.current = null;
+    }
+    if (!wantRef.current) {
+      await sentinel.release();
+      return;
+    }
+    lockRef.current = sentinel;
+    sentinel.addEventListener("release", () => {
+      if (lockRef.current === sentinel) lockRef.current = null;
+      if (!wantRef.current || document.visibilityState !== "visible") return;
+      void holdRef.current().catch((cause: unknown) => {
+        wantRef.current = false;
+        setRunning(false);
+        setStartedAt(null);
+        setError(messageFrom(cause));
+      });
+    });
+  }
+
+  holdRef.current = hold;
+
+  async function start() {
+    setPending(true);
+    setError(null);
+    wantRef.current = true;
+    try {
+      await hold();
+      if (!wantRef.current) return;
+      setRunning(true);
+      setStartedAt((current) => current ?? Date.now());
+    } catch (cause) {
+      wantRef.current = false;
+      setRunning(false);
+      setStartedAt(null);
+      setError(messageFrom(cause));
+    } finally {
+      setPending(false);
     }
   }
 
-  function chooseInterval(next: IntervalSeconds) {
-    setIntervalSeconds(next);
-    if (status?.running) {
-      void send({ action: "start", intervalSeconds: next });
+  async function stop() {
+    setPending(true);
+    wantRef.current = false;
+    try {
+      await lockRef.current?.release();
+    } catch {
+      lockRef.current = null;
     }
+    setRunning(false);
+    setStartedAt(null);
+    setPending(false);
   }
 
-  const running = status?.running ?? false;
-  const justNibbled =
-    status?.lastNudgeAt != null && now != null && now - status.lastNudgeAt < 900;
-  const alertMessage = requestError ?? status?.lastError ?? null;
-  const secondsLeft =
-    running && status?.nextNudgeAt != null && now != null
-      ? Math.max(0, Math.ceil((status.nextNudgeAt - now) / 1000))
-      : null;
-  const ready = !localMachine || status !== null || requestError !== null;
-  const ticketClass = !localMachine
-    ? "ticket ticket-error"
-    : alertMessage && !running
-      ? "ticket ticket-error"
-      : running
-        ? "ticket ticket-hot"
-        : "ticket";
-  const ticketLabel = !localMachine
-    ? "Otro equipo"
-    : !ready
-      ? "Comprobando"
-      : alertMessage && !running
-        ? "Error"
-        : running
-          ? "En movimiento"
-          : "En espera";
+  const elapsed =
+    running && startedAt != null && now != null ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
+  const ticketClass = error && !running ? "ticket ticket-error" : running ? "ticket ticket-hot" : "ticket";
+  const ticketLabel = error && !running ? "Error" : running ? "Despierta" : "En espera";
 
   return (
     <div className="cheese-body flex min-h-dvh flex-col overflow-x-hidden">
@@ -140,13 +146,13 @@ export function CheesePoster({ localMachine }: { localMachine: boolean }) {
             </p>
             <p className="stamp" aria-hidden="true">
               <small>100%</small>
-              <strong>{localMachine ? "local" : "remoto"}</strong>
+              <strong>web</strong>
             </p>
           </div>
 
           <div className="poster-hero">
             <div>
-              <p className="kicker">el ratón que mantiene el PC despierto</p>
+              <p className="kicker">la página que mantiene la pantalla despierta</p>
               <h1 id="wordmark" className="wordmark">
                 <span className="block">mouse</span>
                 <span className="block">
@@ -154,139 +160,79 @@ export function CheesePoster({ localMachine }: { localMachine: boolean }) {
                 </span>
               </h1>
             </div>
-            <CheeseMark running={running || justNibbled} />
+            <CheeseMark running={running} />
           </div>
 
           <div className="rule" aria-hidden="true" />
 
-          {localMachine && alertMessage ? (
+          {error ? (
             <p className="alert-sticker" role="alert">
-              {alertMessage}
+              {error}
             </p>
           ) : null}
 
-          {localMachine && running ? (
+          {!supported && !error ? (
+            <p className="alert-sticker" role="alert">
+              Este navegador no puede mantener la pantalla despierta. Prueba con Chrome, Edge o Safari.
+            </p>
+          ) : null}
+
+          {running ? (
             <div className="countdown">
-              <strong>{secondsLeft ?? "…"}</strong>
+              <strong>{formatElapsed(elapsed)}</strong>
               <span>
-                {justNibbled
-                  ? "mordisco: el puntero se apartó y ya volvió"
-                  : secondsLeft === 1
-                    ? "segundo para el próximo mordisco"
-                    : "segundos para el próximo mordisco"}
+                {elapsed >= 60
+                  ? "con la pantalla despierta"
+                  : elapsed === 1
+                    ? "segundo con la pantalla despierta"
+                    : "segundos con la pantalla despierta"}
               </span>
             </div>
           ) : null}
 
-          {localMachine ? (
-            <LocalControls
-              running={running}
-              ready={ready}
-              pending={pending}
-              intervalSeconds={intervalSeconds}
-              onInterval={chooseInterval}
-              onToggle={() =>
-                void send(running ? { action: "stop" } : { action: "start", intervalSeconds })
-              }
-              platform={status ? PLATFORM_NAME[status.platform] : null}
-            />
-          ) : (
-            <RemoteNotice />
-          )}
-        </article>
-      </main>
-
-      <footer className="site-footer">
-        {localMachine
-          ? "Este servidor está en tu equipo. Comenzar mueve el puntero de esta computadora."
-          : "Vercel puede mostrar este cartel a cualquiera. El puntero solo se mueve si el programa corre en esa misma computadora."}
-      </footer>
-    </div>
-  );
-}
-
-function LocalControls({
-  running,
-  ready,
-  pending,
-  intervalSeconds,
-  onInterval,
-  onToggle,
-  platform,
-}: {
-  running: boolean;
-  ready: boolean;
-  pending: boolean;
-  intervalSeconds: IntervalSeconds;
-  onInterval: (next: IntervalSeconds) => void;
-  onToggle: () => void;
-  platform: string | null;
-}) {
-  return (
-    <>
           <p className="lead">
             {running
-              ? "El puntero está en movimiento. Cada mordisco dura un instante y el cursor vuelve solo a su sitio."
-              : "Pulsa Comenzar y el puntero se desplaza unos píxeles y vuelve a su sitio, en el intervalo que elijas. Así evitas la suspensión y el «ausente» en Slack, Teams y otras apps."}
+              ? "Esta pestaña mantiene la pantalla encendida. Si te vas a otra, puede soltarse; al volver, se engancha sola."
+              : "Pulsa Comenzar. Mientras esta pestaña siga abierta y a la vista, el navegador pide que la pantalla no se apague. No hay que instalar nada."}
           </p>
 
-          <fieldset className="mt-5" disabled={pending || !ready}>
-            <legend className="field-label">Intervalo del mordisco</legend>
-            <div className="intervals">
-              {INTERVAL_OPTIONS.map((option) => (
-                <Button
-                  key={option.value}
-                  type="button"
-                  variant="outline"
-                  className="interval-button"
-                  aria-pressed={intervalSeconds === option.value}
-                  aria-label={option.name}
-                  onClick={() => onInterval(option.value)}
-                >
-                  {option.label}
-                </Button>
-              ))}
-            </div>
-          </fieldset>
           <p className="hint mt-3">
-            Se aparta unos 30 píxeles, se queda medio segundo y vuelve al mismo punto. Elegir 5 s no arranca solo: hace falta Comenzar. No hace clic.
+            Una página web no puede mover el ratón ni hacer clic en Excel, Slack o Teams. Eso lo prohíbe el navegador en cualquier sitio, aunque esté publicado. Esto solo evita que se apague la pantalla.
           </p>
 
           <Button
             type="button"
             className={running ? "action-button stop" : "action-button"}
-            disabled={pending || !ready}
-            onClick={onToggle}
+            disabled={pending || !supported}
+            onClick={() => void (running ? stop() : start())}
           >
             {pending ? "Un momento…" : running ? "Detener" : "Comenzar"}
           </Button>
 
-          <p className="footnote">
-            El servidor{platform ? ` (${platform})` : ""} es quien mueve el ratón, no la página.
-          </p>
-    </>
+          <p className="footnote">Corre en el navegador de quien abre la página. No hay un servidor moviendo nada.</p>
+        </article>
+      </main>
+
+      <footer className="site-footer">
+        Cualquiera puede abrir este sitio. Comenzar mantiene despierta la pantalla de esa persona mientras la pestaña esté visible.
+      </footer>
+    </div>
   );
 }
 
-function RemoteNotice() {
-  return (
-    <>
-      <p className="alert-sticker" role="alert">
-        Tu ratón no se mueve desde aquí. Esta página está en otro equipo. El navegador no puede mover el puntero, y un servidor en Vercel tampoco: no es tu computadora.
-      </p>
-      <p className="lead">
-        Cualquiera puede abrir el sitio. El mordisco, en cambio, corre en la máquina de cada persona. En tu computadora:
-      </p>
-      <ol className="steps">
-        <li>npm install</li>
-        <li>npm run dev</li>
-        <li>Abre http://127.0.0.1:38471 y pulsa Comenzar</li>
-      </ol>
-      <p className="hint mt-3">
-        Publicar el cartel en Vercel sirve para compartirlo. Slack, Teams y la suspensión solo se enteran si el programa está en marcha en el mismo equipo que el puntero.
-      </p>
-    </>
-  );
+function messageFrom(error: unknown): string {
+  if (error instanceof DOMException && error.name === "NotAllowedError") {
+    return "El navegador bloqueó mantener la pantalla despierta. Deja esta pestaña visible y pulsa Comenzar de nuevo.";
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return "No se pudo mantener la pantalla despierta.";
+}
+
+function formatElapsed(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return String(seconds);
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function CheeseMark({ running }: { running: boolean }) {

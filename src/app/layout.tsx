@@ -22,7 +22,7 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "mouse&cheese",
   description:
-    "Un ratón que mordisquea el puntero para que el equipo no se suspenda y las apps no te marquen ausente.",
+    "Una página para mantener la pantalla despierta. La abre cualquiera, sin instalar nada.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
